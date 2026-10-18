@@ -1,0 +1,23 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+backend/uploads/
+frontend/build/
+
+
+# Docker (local only)
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile
+.dockerignore
+frontend/nginx.conf
+node_modules/
+build/
+dist/
+.env
+.env.*
+*.pem
+*.log
+.DS_Store
+.vscode/
