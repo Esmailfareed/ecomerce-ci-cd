@@ -100,4 +100,3 @@ pipeline {
     }
 }
  
-Claude finished the response
