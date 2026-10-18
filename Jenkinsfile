@@ -1,5 +1,4 @@
 
-Jenkinsfile
 pipeline {
     // Change 'any' to your agent label (e.g. label 'worker') to pin it to the two workers
     agent any
