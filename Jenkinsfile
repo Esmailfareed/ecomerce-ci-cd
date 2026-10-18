@@ -1,101 +1,55 @@
 pipeline {
-    // Change 'any' to your agent label (e.g. label 'worker') to pin the job to the two workers
+    // Change 'any' to your agent label (e.g. label 'worker') to pin it to the two workers
     agent any
 
     options {
         timestamps()
-        timeout(time: 10, unit: 'MINUTES')
+        timeout(time: 5, unit: 'MINUTES')
+    }
+
+    parameters {
+        string(name: 'KUBECTL_ARGS',
+               defaultValue: 'get pods -n kube-system',
+               description: 'Arguments passed to kubectl, e.g. "get nodes" or "get pods -n workshop -o wide"')
     }
 
     environment {
         AWS_REGION   = 'us-east-1'
         CLUSTER_NAME = 'eks-cluster'
-        NAMESPACE    = 'workshop'
     }
 
     stages {
 
-        stage('Hello') {
+        stage('Where am I running?') {
             steps {
-                echo '=============================='
-                echo ' Jenkinsfile test: it works!'
-                echo '=============================='
-                echo "Job: ${env.JOB_NAME}  Build: #${env.BUILD_NUMBER}"
-                echo "Branch: ${env.BRANCH_NAME ?: env.GIT_BRANCH}"
                 sh '''
-                    echo "Running on host: $(hostname)"
-                    echo "Running as user: $(whoami)"
-                    echo "Workspace: $(pwd)"
-                    date
+                    echo "Agent host : $(hostname)"
+                    echo "User       : $(whoami)"
+                    aws sts get-caller-identity
                 '''
             }
         }
 
-        stage('Repo contents') {
+        stage('Connect to EKS') {
             steps {
+                sh 'aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"'
+            }
+        }
+
+        stage('Run kubectl command') {
+            steps {
+                echo "Running: kubectl ${params.KUBECTL_ARGS}"
                 sh '''
-                    echo "--- files in repo root ---"
-                    ls -la
-                    echo "--- last commit ---"
-                    git log -1 --oneline
+                    echo "================= RESPONSE ================="
+                    kubectl $KUBECTL_ARGS
+                    echo "============================================"
                 '''
-            }
-        }
-
-        stage('Tool versions') {
-            steps {
-                sh '''
-                    echo "--- tools installed on this agent ---"
-                    git --version
-                    docker --version
-                    aws --version
-                    kubectl version --client
-                    eksctl version
-                    helm version --short
-                    java -version 2>&1 | head -n1
-                '''
-            }
-        }
-
-        stage('Internet check') {
-            steps {
-                sh 'curl -sS -m 10 -I https://github.com | head -n1'
-            }
-        }
-
-        stage('AWS identity') {
-            steps {
-                // Shows which IAM role the worker is using (should be eks-describe-jinkins)
-                sh 'aws sts get-caller-identity'
-            }
-        }
-
-        stage('EKS connection') {
-            steps {
-                // UNSTABLE (yellow) instead of FAILED (red) if the cluster is not reachable yet
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh '''
-                        aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
-                        kubectl get nodes
-                        kubectl get pods -n "$NAMESPACE"
-                    '''
-                }
             }
         }
     }
 
     post {
-        success {
-            echo 'RESULT: all test stages passed.'
-        }
-        unstable {
-            echo 'RESULT: pipeline ran, but a stage was unstable (check the EKS connection stage).'
-        }
-        failure {
-            echo 'RESULT: a stage failed. Read the stage log above to see which tool or command broke.'
-        }
-        always {
-            echo 'Pipeline finished.'
-        }
+        success { echo 'Command finished. The response is printed in the "Run kubectl command" stage above.' }
+        failure { echo 'Command failed. Read the error above: timeout = security group/network, Unauthorized = access entry, Forbidden = policy too narrow.' }
     }
 }
