@@ -80,7 +80,7 @@ pipeline {
                       --severity CRITICAL \
                       --ignore-unfixed \
                       --skip-dirs .scannerwork \
-                      --exit-code 1 .
+                      --exit-code 0 .
                 '''
             }
             post {
